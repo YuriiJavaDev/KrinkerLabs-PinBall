@@ -38,7 +38,7 @@ MIT, see LICENSE.
 ## Play it (desktop)
 
 ```
-./run.sh
+./run.sh        (Windows: run.bat)
 ```
 
 Z or Left = left flipper, / or Right = right flipper, Shift+Left/Right = nudge, Space = new ball, Esc = quit.
