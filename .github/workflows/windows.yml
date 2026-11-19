@@ -1,0 +1,40 @@
+name: Windows build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, feature/desktop-window]
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Compile and package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/classes, build/in | Out-Null
+          $src = Get-ChildItem -Recurse core/src/main, desktop/src -Filter *.java | ForEach-Object FullName
+          javac --release 17 -d build/classes $src
+          jar --create --file build/in/KrinkerLabsPinball.jar --main-class com.krinkerlabs.pinball.desktop.Main -C build/classes .
+          jpackage --type app-image --name "KrinkerLabs Pinball" --input build/in `
+            --main-jar KrinkerLabsPinball.jar --main-class com.krinkerlabs.pinball.desktop.Main `
+            --dest build/out
+          Compress-Archive -Path "build/out/KrinkerLabs Pinball" -DestinationPath KrinkerLabsPinball-windows.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: KrinkerLabsPinball-windows
+          path: KrinkerLabsPinball-windows.zip
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: KrinkerLabsPinball-windows.zip
