@@ -20,4 +20,14 @@ public final class Tables {
         t.flippers.add(new Flipper(W - 300, 1440, 120, 12, Math.PI - rest, Math.PI - up, omega));
         return t;
     }
+
+    /** Playable demo table: basic() plus three bumpers. */
+    public static Table demo() {
+        Table t = basic();
+        t.bumpers.add(new Bumper(450, 520, 58, 420, 100));
+        t.bumpers.add(new Bumper(260, 760, 48, 380, 100));
+        t.bumpers.add(new Bumper(640, 760, 48, 380, 100));
+        t.bumpers.add(new Bumper(450, 960, 40, 360, 150));
+        return t;
+    }
 }
