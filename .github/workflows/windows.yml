@@ -33,8 +33,11 @@ jobs:
         with:
           name: KrinkerLabsPinball-windows
           path: KrinkerLabsPinball-windows.zip
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish as a release (download link for testers)
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: build-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: Windows build ${{ github.run_number }}
+          prerelease: true
           files: KrinkerLabsPinball-windows.zip
