@@ -8,7 +8,7 @@ libraries: graphics are drawn in code, sounds are synthesised.
 ```
 core/      pure Java, no dependencies: deterministic physics, tables, scoring, tilt
            (tested here with a bare JDK; a bot can play it without any screen)
-desktop/   (planned) Java2D renderer, keyboard/mouse input
+desktop/   Java2D window and keyboard input (run with ./run.sh)
 android/   (planned) Canvas renderer, touch input, min SDK chosen from distribution data
 ```
 
@@ -34,3 +34,11 @@ Worlds 1 and 2 first (40 sub-levels each, built from themed tables with variants
 ## License
 
 MIT, see LICENSE.
+
+## Play it (desktop)
+
+```
+./run.sh
+```
+
+Z or Left = left flipper, / or Right = right flipper, Shift+Left/Right = nudge, Space = new ball, Esc = quit.
