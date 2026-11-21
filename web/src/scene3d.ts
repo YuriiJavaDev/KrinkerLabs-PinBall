@@ -5,6 +5,8 @@ import { EffectComposer } from '../vendor/three/examples/jsm/postprocessing/Effe
 import { RenderPass } from '../vendor/three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from '../vendor/three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../vendor/three/examples/jsm/postprocessing/OutputPass.js';
+import { RoundedBoxGeometry } from '../vendor/three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { buildRoom, FLOOR } from './room';
 import { Sim, FIELD_W, FIELD_H } from './core';
 import { playfieldTexture, woodTexture, backglassTexture, skyTexture, brickTexture, floorTexture, frontTexture } from './textures';
 
@@ -114,57 +116,47 @@ export class View {
     };
     tri([[158, 1052], [158, 1178], [236, 1246]], 0x1b4f8a); tri([[657, 1052], [657, 1178], [579, 1246]], 0x1b4f8a);
 
-    this.buildRoom();
+    buildRoom(this.scene);
     // cabinet
     const wood = canvasTex(woodTexture()); wood.wrapS = wood.wrapT = THREE.RepeatWrapping; wood.repeat.set(1, 3);
     const woodMat = new THREE.MeshPhysicalMaterial({ map: wood, roughness: 0.4, clearcoat: 0.6, clearcoatRoughness: 0.25 });
-    const box = (w: number, h: number, d: number, x: number, y: number, z: number, m: any) => {
-      const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(x, y, z); me.castShadow = me.receiveShadow = true; s.add(me); return me;
+    const rbox = (w: number, h: number, d: number, r: number, x: number, y: number, z: number, m: any, shadow = true) => {
+      const me = new THREE.Mesh(new RoundedBoxGeometry(w, h, d, 5, r), m); me.position.set(x, y, z); me.castShadow = me.receiveShadow = shadow; s.add(me); return me;
     };
-    const W2 = FIELD_W * S / 2, H2 = FIELD_H * S / 2;
-    box(0.5, 3.5, H2 * 2 + 0.7, -W2 - 0.25, -0.85, 0, woodMat); box(0.5, 3.5, H2 * 2 + 0.7, W2 + 0.25, -0.85, 0, woodMat);
-    box(W2 * 2 + 1.0, 2.1, 0.5, 0, -0.55, H2 + 0.25, woodMat);
-    box(W2 * 2 + 1.0, 2.6, 0.5, 0, -1.3, -H2 - 0.25, woodMat);
-    const frontTex = canvasTex(frontTexture());
-    const front = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2 + 0.9, 1.9), new THREE.MeshPhysicalMaterial({ map: frontTex, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.1 }));
-    front.position.set(0, -0.55, H2 + 0.505); s.add(front);
-    const legMat = new THREE.MeshStandardMaterial({ color: 0xc9d0d8, metalness: 1, roughness: 0.25 });
-    for (const lx of [-W2 - 0.1, W2 + 0.1]) for (const lz of [-H2 + 0.6, H2 - 0.6]) {
-      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 3.6, 24), legMat); leg.position.set(lx, -4.4, lz); leg.castShadow = true; s.add(leg);
-      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 0.12, 24), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 })); foot.position.set(lx, -6.14, lz); s.add(foot);
+    const W2 = FIELD_W * S / 2, H2 = FIELD_H * S / 2, FRONT = H2 + 0.85, TOP = 0.9, BOT = -2.6, LEN = FRONT * 2;
+    // cabinet: two side panels full length, front and back panels flush with their ends, a base board under everything; all edges rounded
+    for (const sx of [-1, 1]) {
+      rbox(0.5, TOP - BOT, LEN, 0.2, sx * (W2 + 0.25), (TOP + BOT) / 2, 0, woodMat);
+      rbox(0.6, 0.1, LEN - 0.1, 0.045, sx * (W2 + 0.25), TOP + 0.04, 0, steel);                 // chrome cap rail sits exactly on top of the panel
     }
-    const glassPane = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2 + 0.2, H2 * 2 + 0.2),
-      new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.035, roughness: 0.02, metalness: 0, envMapIntensity: 2.5, depthWrite: false, clearcoat: 1 }));
+    rbox(W2 * 2 + 1.0, 0.3 + 0.1, LEN, 0.15, 0, BOT + 0.2, 0, woodMat);                              // base board
+    rbox(W2 * 2 + 1.0, 0.5 - BOT, 0.85, 0.2, 0, (0.5 + BOT) / 2, H2 + 0.425, woodMat);                // front panel (lower than the sides so the field is visible)
+    rbox(W2 * 2 + 1.0, TOP - BOT, 0.85, 0.2, 0, (TOP + BOT) / 2, -H2 - 0.425, woodMat);               // back panel
+    rbox(W2 * 2, 0.16, 0.34, 0.07, 0, 0.56, H2 + 0.5, steel);                                           // lockdown bar along the top of the front panel
+    const frontTex = canvasTex(frontTexture());
+    const front = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2 + 0.7, 1.75), new THREE.MeshPhysicalMaterial({ map: frontTex, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.1 }));
+    front.position.set(0, -0.62, FRONT + 0.002); s.add(front);
+    // legs: bolted under the side panels with a mounting plate, tapered, with rubber feet
+    const legMat = new THREE.MeshStandardMaterial({ color: 0xc9d0d8, metalness: 1, roughness: 0.25 });
+    const legLen = BOT - FLOOR - 0.1;
+    for (const lx of [-W2 - 0.25, W2 + 0.25]) for (const lz of [-H2 + 0.2, H2 - 0.2]) {
+      rbox(0.9, 0.14, 0.9, 0.05, lx, BOT - 0.02, lz, legMat);
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.27, legLen, 28), legMat); leg.position.set(lx, BOT - 0.09 - legLen / 2, lz); leg.castShadow = true; s.add(leg);
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.4, 0.14, 28), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 })); foot.position.set(lx, FLOOR + 0.07, lz); s.add(foot);
+    }
+    const glassPane = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2, H2 * 2),
+      new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.03, roughness: 0.02, metalness: 0, envMapIntensity: 2.2, depthWrite: false, clearcoat: 1 }));
     glassPane.rotation.x = -Math.PI / 2; glassPane.position.y = 1.0; glassPane.renderOrder = 5; s.add(glassPane);
-    box(0.12, 0.08, H2 * 2 + 0.7, -W2 - 0.5, 0.92, 0, steel); box(0.12, 0.08, H2 * 2 + 0.7, W2 + 0.5, 0.92, 0, steel);
-    box(W2 * 2 + 1.0, 0.12, 0.16, 0, 0.56, H2 + 0.56, steel);
+    // plunger: collar where the rod leaves the front panel
+    const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.3, 24), steel); collar.rotation.x = Math.PI / 2; collar.position.set(wx(817), 0.22, FRONT + 0.1); s.add(collar);
 
-    // backbox with the backglass
+    // backbox with the backglass: sits on the back panel, flush with its rear edge
     const bgTex = canvasTex(backglassTexture());
     this.backglassMat = new THREE.MeshStandardMaterial({ map: bgTex, emissiveMap: bgTex, emissive: 0xffffff, emissiveIntensity: 0.7, roughness: 0.2 });
-    const bb = new THREE.Group(); bb.position.set(0, 0.5, -H2 - 0.1); bb.rotation.x = -0.12;
-    const frame = new THREE.Mesh(new THREE.BoxGeometry(W2 * 2 + 1.0, 3.8, 0.7), woodMat); frame.position.y = 1.9; frame.castShadow = true; bb.add(frame);
-    const glass = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2 + 0.1, 3.5), this.backglassMat); glass.position.set(0, 1.95, 0.36); bb.add(glass);
+    const bb = new THREE.Group(); bb.position.set(0, TOP, -H2 - 0.45); bb.rotation.x = -0.08;
+    const frame = new THREE.Mesh(new RoundedBoxGeometry(W2 * 2 + 1.0, 3.8, 0.8, 5, 0.18), woodMat); frame.position.y = 1.9; frame.castShadow = true; bb.add(frame);
+    const glass = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2 + 0.1, 3.4), this.backglassMat); glass.position.set(0, 1.95, 0.405); bb.add(glass);
     s.add(bb);
-  }
-
-  private buildRoom() {
-    const s = this.scene, fl = canvasTex(floorTexture()); fl.wrapS = fl.wrapT = THREE.RepeatWrapping; fl.repeat.set(5, 5);
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ map: fl, roughness: 0.55, metalness: 0 }));
-    floor.rotation.x = -Math.PI / 2; floor.position.y = -6.2; floor.receiveShadow = true; s.add(floor);
-    const br = canvasTex(brickTexture()); br.wrapS = br.wrapT = THREE.RepeatWrapping; br.repeat.set(7, 3.5);
-    const wall = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), new THREE.MeshStandardMaterial({ map: br, roughness: 0.92 }));
-    wall.position.set(0, 8.8, -17); s.add(wall);
-    const sideWall = wall.clone(); sideWall.rotation.y = Math.PI / 2; sideWall.position.set(-17, 8.8, 0); s.add(sideWall);
-    const sw2 = wall.clone(); sw2.rotation.y = -Math.PI / 2; sw2.position.set(17, 8.8, 0); s.add(sw2);
-    // soft shadow of the whole cabinet on the floor
-    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
-    const rg = g.createRadialGradient(128, 128, 20, 128, 128, 128); rg.addColorStop(0, 'rgba(0,0,0,0.75)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(0, 0, 256, 256);
-    const blob = new THREE.Mesh(new THREE.PlaneGeometry(20, 28), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
-    blob.rotation.x = -Math.PI / 2; blob.position.y = -6.18; s.add(blob);
-    const lamp = new THREE.PointLight(0xffd6a0, 60, 40, 2); lamp.position.set(0, 9, -9); s.add(lamp);
-    const lamp2 = new THREE.PointLight(0x9fc4ff, 30, 40, 2); lamp2.position.set(-9, 6, 9); s.add(lamp2);
-    s.fog = new THREE.Fog(0x070a16, 28, 70);
   }
 
   private buildDynamic() {
@@ -227,9 +219,9 @@ export class View {
     // plunger
     const pg = new THREE.Group(); pg.position.set(wx(817), 0, wz(1540));
     const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2, 16), new THREE.MeshStandardMaterial({ color: 0xcfd6dd, metalness: 1, roughness: 0.25 }));
-    rod.rotation.x = Math.PI / 2; rod.position.set(0, 0.22, 1.1); rod.scale.y = 1.8; pg.add(rod);
+    rod.rotation.x = Math.PI / 2; rod.position.set(0, 0.22, 1.25); rod.scale.y = 2.1; pg.add(rod);
     const knob = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 14), new THREE.MeshPhysicalMaterial({ color: 0xd33a2a, roughness: 0.3, clearcoat: 1 }));
-    knob.position.set(0, 0.22, 2.1); pg.add(knob);
+    knob.position.set(0, 0.22, 2.45); pg.add(knob);
     s.add(pg); this.plunger = pg;
   }
 
@@ -322,7 +314,7 @@ export class View {
     const fov = THREE.MathUtils.degToRad(this.camera.fov), aspect = w / h;
     const elev = 0.9;
     const needV = 20.5 / 2 / Math.tan(fov / 2), needH = 11.2 / 2 / (Math.tan(fov / 2) * aspect);
-    this.camDist = Math.max(needV * 0.8, needH);
+    this.camDist = Math.max(needV * 0.92, needH);
     this.camElev = elev;
   }
   camDist = 22; camElev = 1;
