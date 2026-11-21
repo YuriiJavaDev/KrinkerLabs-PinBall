@@ -40,5 +40,37 @@ const toTable = (s: Sim, x: number, y: number) => { s.ball.x = x; s.ball.y = y; 
     const f = (i % 120) < 30; s.setFlipper(0, f); s.setFlipper(1, f); s.step();
   }
   that(s.score > 0, 'bot scores within 90 s, score=' + s.score + ', launches=' + launches); }
+{ // saver returns a ball lost right after launch
+  const s = mk(); for (let i = 0; i < 120; i++) s.step(); s.launch(0.2); let saved = 0; s.ev.onSave = () => saved++;
+  s.ball.x = 450; s.ball.y = 1580; s.ball.vy = 400; for (let i = 0; i < 400; i++) s.step();
+  that(saved === 1 && s.ballsLost === 0 && s.ball.alive, 'ball saver returns the ball'); }
+{ // rollover lanes: all three lit gives a multiplier
+  const s = mk(); s.saverLeft = 0;
+  for (const n of s.table.sensors.filter((q) => q.kind === 'lane')) { toTable(s, n.x, n.y); s.step(); }
+  that(s.mult === 2 && s.score >= 3000, 'three lanes give x2, score=' + s.score); }
+{ // drop-target bank: three hits then reset
+  const s = mk(); let bank = 0; s.ev.onBank = () => bank++;
+  for (const tg of s.table.targets.filter((q) => q.kind === 'drop')) { toTable(s, 300, (tg.ay + tg.by) / 2); s.ball.vx = -500; for (let i = 0; i < 40; i++) s.step(); }
+  that(bank === 1 && s.score >= 3000, 'drop bank completes, score=' + s.score);
+  for (let i = 0; i < 400; i++) s.step(); that(s.table.targets.filter((q) => q.kind === 'drop').every((q) => !q.down), 'bank resets'); }
+{ // saucer catches and then kicks the ball out
+  const s = mk(); const u = s.table.saucers[0]; let out = 0; s.ev.onSaucer = (e) => { if (e) out++; };
+  toTable(s, u.x, u.y - 100); s.ball.vy = 200; for (let i = 0; i < 600; i++) s.step();
+  that(out === 1 && s.score >= 1000, 'saucer ejects the ball, out=' + out); that(!s.ball.held, 'ball is free again'); }
+{ // spinner spins and scores
+  const s = mk(); const sp = s.table.sensors.find((q) => q.kind === 'spinner')!; toTable(s, sp.x, sp.y - 10); s.ball.vy = 900; s.ball.vx = 0;
+  for (let i = 0; i < 20; i++) s.step(); that(Math.abs(sp.omega) > 1 || s.score > 0, 'spinner spins'); }
+{ // no ball may get stuck: many launch strengths, flippers flapping, 3 minutes each
+  let worst = 0;
+  for (const power of [0.25, 0.5, 0.75, 1]) {
+    const s = mk(); let wait = 120, still = 0;
+    for (let i = 0; i < 240 * 180; i++) {
+      if (!s.ball.alive) { s.newBall(); wait = 120; still = 0; }
+      if (wait > 0) { wait--; if (wait === 0) s.launch(power); }
+      const f = (i % 150) < 40, g = ((i + 60) % 150) < 40; s.setFlipper(0, f); s.setFlipper(1, g); s.step();
+      const b = s.ball; if (b.alive && !b.held && !s.inLane && b.speed < 6) still++; else still = 0; worst = Math.max(worst, still);
+    }
+  }
+  that(worst < 240 * 3, 'no stuck ball: longest rest ' + (worst / 240).toFixed(1) + ' s'); }
 console.log(`${run} checks, ${failed} failed (dt=${DT.toFixed(5)})`);
 if (failed) process.exit(1);

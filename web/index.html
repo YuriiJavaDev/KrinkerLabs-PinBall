@@ -24,6 +24,9 @@
   .btn:active { transform:scale(.94); }
   #banner { position:absolute; left:0; right:0; top:34%; text-align:center; font:900 clamp(40px,10vw,110px)/1 "Trebuchet MS",sans-serif; color:#ff5a5a; text-shadow:0 0 30px rgba(255,60,60,.8); opacity:0; transition:opacity .15s; letter-spacing:.08em; }
   #banner.on { opacity:1; }
+  #toast { position:absolute; left:0; right:0; top:22%; text-align:center; font:900 clamp(26px,5vw,52px)/1 "Trebuchet MS",sans-serif; color:#ffe9a8; text-shadow:0 0 24px rgba(255,180,70,.9); opacity:0; transform:scale(.9); transition:opacity .2s, transform .2s; letter-spacing:.06em; }
+  #toast.on { opacity:1; transform:scale(1); }
+  #mult { position:absolute; right:14px; top:8px; font:900 26px "Trebuchet MS",sans-serif; color:#7affc6; text-shadow:0 0 12px rgba(122,255,198,.8); }
   #hint { position:absolute; left:0; right:0; bottom:max(18px,env(safe-area-inset-bottom)); text-align:center; font-size:15px; opacity:.85; text-shadow:0 2px 8px #000; }
   #charge { position:absolute; right:18px; bottom:130px; width:10px; height:150px; border-radius:5px; background:rgba(255,255,255,.12); overflow:hidden; display:none; }
   #charge b { position:absolute; left:0; right:0; bottom:0; height:0; background:linear-gradient(0deg,#5fd8ff,#ffb84a,#ff5a5a); }
@@ -55,9 +58,10 @@
 <div id="loading">…</div>
 <canvas id="c"></canvas>
 <div class="hud">
-  <div class="panel"><small id="tScore">Score</small><div id="score">0000000</div><div id="balls"></div><div id="tilt"><b></b></div></div>
+  <div class="panel"><small id="tScore">Score</small><div id="score">0000000</div><div id="mult"></div><div id="balls"></div><div id="tilt"><b></b></div></div>
   <div class="tools"><div class="btn" id="bPause" title="Pause (P)">❚❚</div><div class="btn" id="bSound" title="Sound (M)">♪</div></div>
   <div id="banner">TILT</div>
+  <div id="toast"></div>
   <div id="hint"></div>
   <div id="charge"><b></b></div>
   <div class="pads"><div class="nudge" id="nl">⇠</div><div class="nudge" id="nr">⇢</div><div class="pad" id="pl">◀</div><div class="pad" id="pp">▲</div><div class="pad" id="pr">▶</div></div>

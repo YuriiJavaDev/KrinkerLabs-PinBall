@@ -36,4 +36,10 @@ export class Sound {
   tilt() { this.tone('sawtooth', 95, 80, 0.6, 0.35); this.tone('square', 92, 78, 0.6, 0.15); }
   start() { [523, 659, 784, 1047].forEach((f, i) => this.tone('triangle', f, f * 1.003, 0.22, 0.28, i * 0.09)); }
   over() { [784, 659, 523, 392].forEach((f, i) => this.tone('triangle', f, f * 0.99, 0.3, 0.28, i * 0.14)); }
+  target(drop: boolean) { this.tone('square', drop ? 700 : 520, drop ? 300 : 460, 0.07, 0.22); this.noise(0.03, 0.3, 4000, 2500, 3); }
+  bank() { [523, 659, 784, 988, 1175].forEach((f, i) => this.tone('triangle', f, f * 1.002, 0.16, 0.3, i * 0.06)); }
+  lane(done: boolean) { this.tone('sine', done ? 1175 : 880, done ? 1760 : 1100, 0.14, 0.3); if (done) [784, 988, 1319].forEach((f, i) => this.tone('triangle', f, f, 0.2, 0.25, 0.08 + i * 0.07)); }
+  spin() { this.tone('square', 1500, 1300, 0.025, 0.08); }
+  saucer(eject: boolean) { if (eject) { this.tone('sawtooth', 160, 700, 0.18, 0.3); this.noise(0.12, 0.35, 700, 2600, 1); } else { this.tone('sine', 300, 90, 0.25, 0.4); } }
+  save() { [880, 660, 880, 1100].forEach((f, i) => this.tone('triangle', f, f, 0.12, 0.28, i * 0.08)); }
 }
