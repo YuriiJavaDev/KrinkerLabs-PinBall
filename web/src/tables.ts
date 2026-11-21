@@ -13,17 +13,14 @@ export function forestTable(): Table {
     const a0 = Math.PI + (Math.PI * i) / N, a1 = Math.PI + (Math.PI * (i + 1)) / N;
     wall(cx + R * Math.cos(a0), cy + R * Math.sin(a0), cx + R * Math.cos(a1), cy + R * Math.sin(a1), 0.45);
   }
-  wall(40, 450, 40, 1700);                 // left wall; the outlane runs down to the drain
+  wall(40, 450, 40, 1250);                 // left wall, then one smooth funnel down to the left flipper
+  wall(40, 1250, 300, 1432, 0.3);
+  wall(775, 1250, 618, 1432, 0.3);         // right funnel, joined to the plunger-lane wall
   wall(860, 450, 860, 1540);               // outer wall of the plunger lane
-  wall(775, 560, 775, 1700);               // inner wall of the plunger lane
+  wall(775, 560, 775, 1540);               // inner wall of the plunger lane
   wall(775, 1540, 860, 1540, 0.1);         // lane floor
   // upper right: guide that sends the launched ball into the arc, not back down
   wall(775, 560, 800, 470, 0.3);
-  // inlane guides
-  wall(110, 1130, 110, 1230, 0.3);
-  wall(110, 1230, 270, 1395, 0.3);
-  wall(705, 1130, 705, 1230, 0.3);
-  wall(705, 1230, 645, 1395, 0.3);
   // upper deflectors: turn the fast ball coming down the side walls back into the playfield
   wall(40, 780, 140, 860, 0.55); wall(775, 780, 690, 855, 0.55);
   // top rollover lanes (dividers start below the launch path along the arc)
