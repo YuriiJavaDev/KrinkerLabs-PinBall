@@ -6,7 +6,7 @@ import { RenderPass } from '../vendor/three/examples/jsm/postprocessing/RenderPa
 import { UnrealBloomPass } from '../vendor/three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from '../vendor/three/examples/jsm/postprocessing/OutputPass.js';
 import { Sim, FIELD_W, FIELD_H } from './core';
-import { playfieldTexture, woodTexture, backglassTexture, skyTexture } from './textures';
+import { playfieldTexture, woodTexture, backglassTexture, skyTexture, brickTexture, floorTexture, frontTexture } from './textures';
 
 const S = 0.01;                                   // field unit -> world unit
 const wx = (x: number) => x * S - FIELD_W * S / 2;
@@ -29,12 +29,12 @@ export class View {
     r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 0.85;
 
     const pm = new THREE.PMREMGenerator(r);
-    this.scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
+    this.scene.environment = pm.fromScene(this.studioEnv(), 0.02).texture;
     this.scene.environmentIntensity = 0.35;
     const sky = canvasTex(skyTexture()); this.scene.background = sky;
 
     this.camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
-    this.buildLights(); this.buildTable(); this.buildDynamic(); this.buildFireflies();
+    this.buildLights(); this.buildTable(); this.buildDynamic(); this.buildFireflies(); this.attachOrbit();
 
     const size = r.getSize(new THREE.Vector2());
     const rt = new THREE.WebGLRenderTarget(size.x, size.y, { samples: 4, type: THREE.HalfFloatType });
@@ -44,6 +44,18 @@ export class View {
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
     this.resize();
+  }
+
+  /** Reflection environment: a dark room with coloured softboxes, so lacquer and chrome get long highlights. */
+  private studioEnv() {
+    const e = new THREE.Scene(); e.background = new THREE.Color(0.02, 0.025, 0.04);
+    const panel = (x: number, y: number, z: number, w: number, h: number, d: number, c: number[]) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ color: new THREE.Color(c[0], c[1], c[2]) }));
+      m.position.set(x, y, z); e.add(m);
+    };
+    panel(0, 9, 0, 12, 0.3, 7, [7, 6.4, 5.6]); panel(-9, 3, 2, 0.3, 5, 8, [1.4, 3, 7]); panel(9, 3, -2, 0.3, 5, 8, [7, 2.2, 3.6]);
+    panel(0, 3, 11, 9, 4, 0.3, [4.5, 3.8, 2.6]); panel(0, 3, -11, 12, 5, 0.3, [1, 1.6, 3.5]); panel(-4, 6, -6, 3, 0.3, 3, [5, 5, 6]);
+    return e;
   }
 
   private buildLights() {
@@ -62,7 +74,7 @@ export class View {
 
   private buildTable() {
     const s = this.scene, t = this.sim.table;
-    const pfTex = canvasTex(playfieldTexture());
+    const pfTex = canvasTex(playfieldTexture(t, (matchMedia('(pointer: coarse)').matches || window.innerWidth < 700) ? 1024 : 2048));
     const field = new THREE.Mesh(new THREE.PlaneGeometry(FIELD_W * S, FIELD_H * S),
       new THREE.MeshPhysicalMaterial({ map: pfTex, roughness: 0.42, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.06, envMapIntensity: 0.9 }));
     field.rotation.x = -Math.PI / 2; field.receiveShadow = true; s.add(field);
@@ -71,8 +83,11 @@ export class View {
     const plastic = new THREE.MeshPhysicalMaterial({ color: 0x0f2f4a, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1 });
     const rubber = new THREE.MeshStandardMaterial({ color: 0xff6a3a, roughness: 0.55, emissive: 0x6a1a00, emissiveIntensity: 0.6 });
 
+    // the big arc: one smooth chrome tube
+    const arcPts: any[] = []; t.walls.slice(0, 28).forEach((w, i) => { arcPts.push(new THREE.Vector3(wx(w.ax), 0.46, wz(w.ay))); if (i === 27) arcPts.push(new THREE.Vector3(wx(w.bx), 0.46, wz(w.by))); });
+    const arcTube = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(arcPts), 160, 0.085, 14), steel); arcTube.castShadow = true; s.add(arcTube);
     // wall rails
-    for (const w of t.walls) {
+    for (const [wi, w] of t.walls.entries()) {
       const ax = wx(w.ax), az = wz(w.ay), bx = wx(w.bx), bz = wz(w.by);
       const len = Math.hypot(bx - ax, bz - az), ang = Math.atan2(bz - az, bx - ax);
       const g = new THREE.Group(); g.position.set((ax + bx) / 2, 0, (az + bz) / 2); g.rotation.y = -ang;
@@ -81,12 +96,12 @@ export class View {
         rub.rotation.z = Math.PI / 2; rub.position.y = 0.2; rub.castShadow = true; g.add(rub);
       } else {
         const body = new THREE.Mesh(new THREE.BoxGeometry(len + 0.1, 0.42, 0.16), plastic); body.position.y = 0.21; body.castShadow = body.receiveShadow = true; g.add(body);
-        const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, len + 0.08, 12), steel);
-        rail.rotation.z = Math.PI / 2; rail.position.y = 0.46; rail.castShadow = true; g.add(rail);
+        if (wi >= 28) { const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.085, len + 0.08, 14), steel);
+        rail.rotation.z = Math.PI / 2; rail.position.y = 0.46; rail.castShadow = true; g.add(rail); }
       }
       s.add(g);
-      const ball = new THREE.Mesh(new THREE.SphereGeometry(w.kick ? 0.07 : 0.075, 12, 8), w.kick ? rubber : steel);
-      ball.position.set(ax, w.kick ? 0.2 : 0.46, az); s.add(ball);
+      if (wi >= 28) { const post = new THREE.Mesh(new THREE.SphereGeometry(w.kick ? 0.07 : 0.088, 14, 10), w.kick ? rubber : steel);
+      post.position.set(ax, w.kick ? 0.2 : 0.46, az); s.add(post); }
     }
 
     // slingshot plastic triangles
@@ -94,11 +109,12 @@ export class View {
       const sh = new THREE.Shape(); pts.forEach(([x, y], i) => i ? sh.lineTo(wx(x), -wz(y)) : sh.moveTo(wx(x), -wz(y)));
       const geo = new THREE.ExtrudeGeometry(sh, { depth: 0.14, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 3 });
       geo.rotateX(-Math.PI / 2); geo.translate(0, 0.02, 0);
-      const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.3, clearcoat: 1, emissive: col, emissiveIntensity: 0.25 }));
+      const m = new THREE.Mesh(geo, new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.25, clearcoat: 1, emissive: col, emissiveIntensity: 0.18 }));
       m.castShadow = m.receiveShadow = true; s.add(m);
     };
-    tri([[158, 1052], [158, 1178], [236, 1246]], 0xff8a2a); tri([[657, 1052], [657, 1178], [579, 1246]], 0xff8a2a);
+    tri([[158, 1052], [158, 1178], [236, 1246]], 0x1b4f8a); tri([[657, 1052], [657, 1178], [579, 1246]], 0x1b4f8a);
 
+    this.buildRoom();
     // cabinet
     const wood = canvasTex(woodTexture()); wood.wrapS = wood.wrapT = THREE.RepeatWrapping; wood.repeat.set(1, 3);
     const woodMat = new THREE.MeshPhysicalMaterial({ map: wood, roughness: 0.4, clearcoat: 0.6, clearcoatRoughness: 0.25 });
@@ -106,11 +122,22 @@ export class View {
       const me = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); me.position.set(x, y, z); me.castShadow = me.receiveShadow = true; s.add(me); return me;
     };
     const W2 = FIELD_W * S / 2, H2 = FIELD_H * S / 2;
-    box(0.5, 1.1, H2 * 2 + 0.7, -W2 - 0.25, 0.35, 0, woodMat); box(0.5, 1.1, H2 * 2 + 0.7, W2 + 0.25, 0.35, 0, woodMat);
-    box(W2 * 2 + 1.0, 0.7, 0.5, 0, 0.15, H2 + 0.25, woodMat);
+    box(0.5, 3.5, H2 * 2 + 0.7, -W2 - 0.25, -0.85, 0, woodMat); box(0.5, 3.5, H2 * 2 + 0.7, W2 + 0.25, -0.85, 0, woodMat);
+    box(W2 * 2 + 1.0, 2.1, 0.5, 0, -0.55, H2 + 0.25, woodMat);
+    box(W2 * 2 + 1.0, 2.6, 0.5, 0, -1.3, -H2 - 0.25, woodMat);
+    const frontTex = canvasTex(frontTexture());
+    const front = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2 + 0.9, 1.9), new THREE.MeshPhysicalMaterial({ map: frontTex, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.1 }));
+    front.position.set(0, -0.55, H2 + 0.505); s.add(front);
+    const legMat = new THREE.MeshStandardMaterial({ color: 0xc9d0d8, metalness: 1, roughness: 0.25 });
+    for (const lx of [-W2 - 0.1, W2 + 0.1]) for (const lz of [-H2 + 0.6, H2 - 0.6]) {
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.24, 3.6, 24), legMat); leg.position.set(lx, -4.4, lz); leg.castShadow = true; s.add(leg);
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.38, 0.12, 24), new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.6 })); foot.position.set(lx, -6.14, lz); s.add(foot);
+    }
+    const glassPane = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2 + 0.2, H2 * 2 + 0.2),
+      new THREE.MeshPhysicalMaterial({ color: 0xffffff, transparent: true, opacity: 0.035, roughness: 0.02, metalness: 0, envMapIntensity: 2.5, depthWrite: false, clearcoat: 1 }));
+    glassPane.rotation.x = -Math.PI / 2; glassPane.position.y = 1.0; glassPane.renderOrder = 5; s.add(glassPane);
     box(0.12, 0.08, H2 * 2 + 0.7, -W2 - 0.5, 0.92, 0, steel); box(0.12, 0.08, H2 * 2 + 0.7, W2 + 0.5, 0.92, 0, steel);
-    box(W2 * 2 + 1.0, 0.08, 0.12, 0, 0.52, H2 + 0.5, steel);
-    box(W2 * 2 + 3.0, 0.2, H2 * 2 + 4, 0, -1.2, 0, new THREE.MeshStandardMaterial({ color: 0x0b0f1a, roughness: 0.9 }));
+    box(W2 * 2 + 1.0, 0.12, 0.16, 0, 0.56, H2 + 0.56, steel);
 
     // backbox with the backglass
     const bgTex = canvasTex(backglassTexture());
@@ -119,6 +146,25 @@ export class View {
     const frame = new THREE.Mesh(new THREE.BoxGeometry(W2 * 2 + 1.0, 3.8, 0.7), woodMat); frame.position.y = 1.9; frame.castShadow = true; bb.add(frame);
     const glass = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2 + 0.1, 3.5), this.backglassMat); glass.position.set(0, 1.95, 0.36); bb.add(glass);
     s.add(bb);
+  }
+
+  private buildRoom() {
+    const s = this.scene, fl = canvasTex(floorTexture()); fl.wrapS = fl.wrapT = THREE.RepeatWrapping; fl.repeat.set(5, 5);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), new THREE.MeshStandardMaterial({ map: fl, roughness: 0.55, metalness: 0 }));
+    floor.rotation.x = -Math.PI / 2; floor.position.y = -6.2; floor.receiveShadow = true; s.add(floor);
+    const br = canvasTex(brickTexture()); br.wrapS = br.wrapT = THREE.RepeatWrapping; br.repeat.set(7, 3.5);
+    const wall = new THREE.Mesh(new THREE.PlaneGeometry(60, 30), new THREE.MeshStandardMaterial({ map: br, roughness: 0.92 }));
+    wall.position.set(0, 8.8, -17); s.add(wall);
+    const sideWall = wall.clone(); sideWall.rotation.y = Math.PI / 2; sideWall.position.set(-17, 8.8, 0); s.add(sideWall);
+    const sw2 = wall.clone(); sw2.rotation.y = -Math.PI / 2; sw2.position.set(17, 8.8, 0); s.add(sw2);
+    // soft shadow of the whole cabinet on the floor
+    const c = document.createElement('canvas'); c.width = c.height = 256; const g = c.getContext('2d');
+    const rg = g.createRadialGradient(128, 128, 20, 128, 128, 128); rg.addColorStop(0, 'rgba(0,0,0,0.75)'); rg.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = rg; g.fillRect(0, 0, 256, 256);
+    const blob = new THREE.Mesh(new THREE.PlaneGeometry(20, 28), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
+    blob.rotation.x = -Math.PI / 2; blob.position.y = -6.18; s.add(blob);
+    const lamp = new THREE.PointLight(0xffd6a0, 60, 40, 2); lamp.position.set(0, 9, -9); s.add(lamp);
+    const lamp2 = new THREE.PointLight(0x9fc4ff, 30, 40, 2); lamp2.position.set(-9, 6, 9); s.add(lamp2);
+    s.fog = new THREE.Fog(0x070a16, 28, 70);
   }
 
   private buildDynamic() {
@@ -157,7 +203,7 @@ export class View {
     }
 
     // flippers
-    const fl = new THREE.MeshPhysicalMaterial({ color: 0xff7a3d, roughness: 0.35, clearcoat: 1, emissive: 0x7a2000, emissiveIntensity: 0.45 });
+    const fl = new THREE.MeshPhysicalMaterial({ color: 0xe8451f, roughness: 0.3, clearcoat: 1, emissive: 0x501000, emissiveIntensity: 0.3 });
     for (const f of this.sim.table.flippers) {
       const L = f.length * S, R0 = 0.17, R1 = 0.12, sh = new THREE.Shape();
       sh.absarc(0, 0, R0, Math.PI / 2, -Math.PI / 2, false);
@@ -171,6 +217,8 @@ export class View {
       s.add(g); this.flippers.push(g);
     }
 
+    this.buildFeatures();
+
     // ball
     this.ball = new THREE.Mesh(new THREE.SphereGeometry(this.sim.table.ballRadius * S, 48, 32),
       new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 1, roughness: 0.08, envMapIntensity: 1.6 }));
@@ -179,10 +227,71 @@ export class View {
     // plunger
     const pg = new THREE.Group(); pg.position.set(wx(817), 0, wz(1540));
     const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2, 16), new THREE.MeshStandardMaterial({ color: 0xcfd6dd, metalness: 1, roughness: 0.25 }));
-    rod.rotation.x = Math.PI / 2; rod.position.set(0, 0.22, 0.6); pg.add(rod);
+    rod.rotation.x = Math.PI / 2; rod.position.set(0, 0.22, 1.1); rod.scale.y = 1.8; pg.add(rod);
     const knob = new THREE.Mesh(new THREE.SphereGeometry(0.2, 20, 14), new THREE.MeshPhysicalMaterial({ color: 0xd33a2a, roughness: 0.3, clearcoat: 1 }));
-    knob.position.set(0, 0.22, 1.25); pg.add(knob);
+    knob.position.set(0, 0.22, 2.1); pg.add(knob);
     s.add(pg); this.plunger = pg;
+  }
+
+  inserts: any[] = []; dropMeshes: any[] = []; standMeshes: any[] = []; spinners: any[] = []; saucerObjs: any[] = []; stars: any[] = [];
+  private insertMat(col: number) { return new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.1, roughness: 0.25, metalness: 0 }); }
+
+  /** Lanes, stars, targets, saucer, spinner and props: the classic furniture of a pinball table. */
+  private buildFeatures() {
+    const s = this.scene, t = this.sim.table;
+    const steel = new THREE.MeshStandardMaterial({ color: 0xaab2bb, metalness: 1, roughness: 0.28 });
+    // rollover lane lights
+    for (const n of t.sensors) if (n.kind === 'lane') {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.03, 32), this.insertMat(0x7affc6)); m.position.set(wx(n.x), 0.02, wz(n.y)); s.add(m); this.inserts.push({ n, m });
+    }
+    // star lights above the flippers, lit by progress
+    const starShape = (r: number) => { const sh = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r; i ? sh.lineTo(Math.cos(a) * rr, -Math.sin(a) * rr) : sh.moveTo(Math.cos(a) * rr, -Math.sin(a) * rr); } return sh; };
+    for (let i = 0; i < 5; i++) {
+      const geo = new THREE.ExtrudeGeometry(starShape(0.3), { depth: 0.03, bevelEnabled: true, bevelSize: 0.015, bevelThickness: 0.015, bevelSegments: 2 }); geo.rotateX(-Math.PI / 2);
+      const m = new THREE.Mesh(geo, this.insertMat(i % 2 ? 0xffd34d : 0xff7ab6)); m.position.set(wx(230 + i * 105), 0.02, wz(1010 + (i % 2 ? 36 : 0))); s.add(m); this.stars.push(m);
+    }
+    // drop targets and standup targets
+    for (const tg of t.targets) {
+      const len = Math.hypot(tg.bx - tg.ax, tg.by - tg.ay) * S, drop = tg.kind === 'drop';
+      const mat = new THREE.MeshPhysicalMaterial({ color: drop ? 0xffc83a : 0x4fd8ff, roughness: 0.25, clearcoat: 1, emissive: drop ? 0xff9a00 : 0x00a0ff, emissiveIntensity: 0.25 });
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.5, len), mat); m.castShadow = true;
+      m.position.set(wx((tg.ax + tg.bx) / 2), 0.25, wz((tg.ay + tg.by) / 2)); s.add(m);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.06, len + 0.1), steel); base.position.set(m.position.x, 0.03, m.position.z); s.add(base);
+      (drop ? this.dropMeshes : this.standMeshes).push({ tg, m, mat });
+    }
+    // saucer: a dark pit with a chrome rim and a glow
+    for (const u of t.saucers) {
+      const g = new THREE.Group(); g.position.set(wx(u.x), 0, wz(u.y));
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.06, 14, 40), steel); rim.rotation.x = Math.PI / 2; rim.position.y = 0.06; g.add(rim);
+      const pit = new THREE.Mesh(new THREE.CircleGeometry(0.31, 32), new THREE.MeshBasicMaterial({ color: 0x010306 })); pit.rotation.x = -Math.PI / 2; pit.position.y = 0.03; g.add(pit);
+      const glowMat = new THREE.MeshBasicMaterial({ color: 0x66ddff, transparent: true, opacity: 0 }); const glow = new THREE.Mesh(new THREE.CircleGeometry(0.31, 32), glowMat); glow.rotation.x = -Math.PI / 2; glow.position.y = 0.04; g.add(glow);
+      const light = new THREE.PointLight(0x66ddff, 0, 4, 2); light.position.y = 0.6; g.add(light);
+      s.add(g); this.saucerObjs.push({ u, glowMat, light });
+    }
+    // spinner
+    for (const n of t.sensors) if (n.kind === 'spinner') {
+      const g = new THREE.Group(); g.position.set(wx(n.x), 0.55, wz(n.y));
+      for (const sx of [-0.42, 0.42]) { const post = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 10), steel); post.position.set(sx, -0.25, 0); g.add(post); }
+      const axle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 10), steel); axle.rotation.z = Math.PI / 2; g.add(axle);
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.36, 0.02), new THREE.MeshPhysicalMaterial({ color: 0xffd34d, metalness: 0.9, roughness: 0.2, clearcoat: 1 })); blade.castShadow = true; g.add(blade);
+      s.add(g); this.spinners.push({ n, blade });
+    }
+    // props in the dark corners above the arc: glowing mushrooms and crystals
+    const prof = [[0, 0], [0.1, 0], [0.12, 0.5], [0.1, 0.7]].map(([x, y]) => new THREE.Vector2(x, y));
+    const stem = new THREE.LatheGeometry(prof, 16), cap = new THREE.SphereGeometry(0.5, 24, 14, 0, Math.PI * 2, 0, Math.PI / 2);
+    const mush = (x: number, z: number, sc: number, col: number) => {
+      const g = new THREE.Group(); g.position.set(x, 0.1, z); g.scale.setScalar(sc);
+      g.add(new THREE.Mesh(stem, new THREE.MeshStandardMaterial({ color: 0xe9dcc8, roughness: 0.7 })));
+      const c = new THREE.Mesh(cap, new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.3, clearcoat: 1, emissive: col, emissiveIntensity: 0.5 })); c.position.y = 0.7; c.scale.set(1.2, 0.8, 1.2); c.castShadow = true; g.add(c);
+      s.add(g);
+    };
+    const crystal = (x: number, z: number, sc: number, col: number) => {
+      const g = new THREE.Group(); g.position.set(x, 0.05, z);
+      for (let i = 0; i < 4; i++) { const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.22 * sc * (1 - i * 0.14), 0), new THREE.MeshPhysicalMaterial({ color: col, roughness: 0.1, transmission: 0, clearcoat: 1, emissive: col, emissiveIntensity: 0.9 })); m.scale.y = 2.4; m.position.set(Math.cos(i * 1.7) * 0.3 * sc, 0.25 * sc, Math.sin(i * 1.7) * 0.3 * sc); m.rotation.set(Math.sin(i) * 0.3, i, Math.cos(i) * 0.3); g.add(m); }
+      s.add(g);
+    };
+    mush(-3.9, -7.2, 1.1, 0xff5fa8); mush(-3.3, -7.5, 0.7, 0xffb14a); crystal(-3.2, -6.5, 1, 0x4fd8ff);
+    mush(3.9, -7.2, 1.0, 0xffb14a); mush(3.2, -7.5, 0.65, 0xff5fa8); crystal(3.3, -6.6, 1.1, 0xb58aff);
   }
 
   private buildFireflies() {
@@ -195,30 +304,56 @@ export class View {
     this.fireflies.userData = { base: pos.slice(), seed }; this.scene.add(this.fireflies);
   }
 
+  private updateFeatures(dt: number) {
+    const sim = this.sim;
+    for (const { n, m } of this.inserts) m.material.emissiveIntensity = n.lit ? 2.2 + Math.sin(this.time * 8) * 0.4 : 0.08 + n.flash * 4;
+    const lit = sim.hits % 6; this.stars.forEach((m, i) => { m.material.emissiveIntensity = i < lit ? 2.2 : 0.1; });
+    for (const { tg, m, mat } of this.dropMeshes) { const target = tg.down ? -0.55 : 0.25; m.position.y += (target - m.position.y) * Math.min(1, dt * 18); mat.emissiveIntensity = 0.25 + tg.flash * 4; }
+    for (const { tg, mat } of this.standMeshes) mat.emissiveIntensity = 0.25 + tg.flash * 5;
+    for (const o of this.saucerObjs) { const g = Math.min(1, o.u.glow); o.glowMat.opacity = g * 0.8; o.light.intensity = g * 8; }
+    for (const o of this.spinners) o.blade.rotation.x = o.n.angle;
+  }
+
   resize() {
     const w = this.canvas.clientWidth || window.innerWidth, h = this.canvas.clientHeight || window.innerHeight;
     this.renderer.setSize(w, h, false); this.composer.setSize(w, h);
     this.camera.aspect = w / h; this.camera.updateProjectionMatrix();
     // fit the whole table in view
     const fov = THREE.MathUtils.degToRad(this.camera.fov), aspect = w / h;
-    const elev = THREE.MathUtils.degToRad(aspect < 0.8 ? 66 : 58);
+    const elev = 0.9;
     const needV = 20.5 / 2 / Math.tan(fov / 2), needH = 11.2 / 2 / (Math.tan(fov / 2) * aspect);
     this.camDist = Math.max(needV * 0.8, needH);
     this.camElev = elev;
   }
   camDist = 22; camElev = 1;
+  az = 0; el = 0.85; zoom = 1; tAz = 0; tEl = 0.85; tZoom = 1;
+  private attachOrbit() {
+    const cv = this.canvas, ptrs = new Map<number, { x: number; y: number }>(); let pinch = 0;
+    cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinch = 0; });
+    cv.addEventListener('pointermove', (e) => {
+      const p = ptrs.get(e.pointerId); if (!p) return;
+      const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
+      if (ptrs.size === 1) { this.tAz = Math.max(-1.2, Math.min(1.2, this.tAz - dx * 0.006)); this.tEl = Math.max(0.3, Math.min(1.5, this.tEl + dy * 0.006)); }
+      else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch) this.tZoom = Math.max(0.5, Math.min(1.5, this.tZoom * pinch / d)); pinch = d; }
+    });
+    const up = (e: PointerEvent) => { ptrs.delete(e.pointerId); pinch = 0; };
+    cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+    cv.addEventListener('wheel', (e) => { e.preventDefault(); this.tZoom = Math.max(0.5, Math.min(1.5, this.tZoom * Math.exp(e.deltaY * 0.001))); }, { passive: false });
+    cv.addEventListener('dblclick', () => { this.tAz = 0; this.tEl = 0.85; this.tZoom = 1; });
+  }
 
   nudgeShake(dir: number) { this.shake = 1; this.shakeDir = dir; }
   shakeDir = 0;
 
   render(dt: number, charge: number) {
     this.time += dt; const sim = this.sim, ball = sim.ball;
-    this.ball.visible = ball.alive; this.ball.position.set(wx(ball.x), ball.r * S, wz(ball.y));
+    this.ball.visible = ball.alive && !ball.held; this.ball.position.set(wx(ball.x), ball.r * S, wz(ball.y));
     sim.table.flippers.forEach((f, i) => { this.flippers[i].rotation.y = -f.angle; });
     for (const o of this.bumpers) {
       const f = Math.min(1, o.b.flash / 0.18);
       if (o.kind === 'pop') { o.mat.emissiveIntensity = 0.22 + f * 2.4; const s = o.sc * (1 + f * 0.12); o.body.scale.set(s, o.sc * (1 - f * 0.08), s); }
     }
+    this.updateFeatures(dt);
     const pull = charge * 0.55; this.plunger.position.z = wz(1540) + pull;
     this.bumperLights[0].intensity = 9 + Math.sin(this.time * 2) * 1.5;
     // fireflies
@@ -231,10 +366,11 @@ export class View {
     // camera
     this.shake = Math.max(0, this.shake - dt * 5);
     const sx = Math.sin(this.time * 90) * 0.05 * this.shake + this.shakeDir * this.shake * 0.12;
-    const cx = THREE.MathUtils.clamp(wx(ball.x) * 0.06, -0.3, 0.3);
-    const cy = Math.sin(this.camElev) * this.camDist, cz = Math.cos(this.camElev) * this.camDist + 0.8;
-    this.camera.position.set(cx + sx, cy, cz);
-    this.camera.lookAt(cx * 0.5 + sx, 0.4, 0.8);
+    const k = Math.min(1, dt * 9); this.az += (this.tAz - this.az) * k; this.el += (this.tEl - this.el) * k; this.zoom += (this.tZoom - this.zoom) * k;
+    const dd = this.camDist * this.zoom, ce = Math.cos(this.el), se = Math.sin(this.el);
+    const tx = 0, ty = 0, tz = 0.9;
+    this.camera.position.set(tx + Math.sin(this.az) * ce * dd + sx, ty + se * dd, tz + Math.cos(this.az) * ce * dd);
+    this.camera.lookAt(tx + sx, ty, tz);
     this.bloom.strength = 0.35 + (sim.tilted ? 0.2 : 0);
     this.composer.render();
   }

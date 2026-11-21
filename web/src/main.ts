@@ -14,6 +14,8 @@ const T = {
 }[L];
 
 const $ = (id: string) => document.getElementById(id)!;
+let toastTimer = 0;
+function toast(msg: string) { const el = $('toast'); el.textContent = msg; el.classList.add('on'); clearTimeout(toastTimer); toastTimer = window.setTimeout(() => el.classList.remove('on'), 1600); }
 const touch = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 if (touch) document.body.classList.add('touch');
 $('tScore').textContent = T.score; $('tWorld').textContent = T.world; $('play').textContent = T.play; $('again').textContent = T.again;
@@ -32,6 +34,12 @@ sim.ev.onWall = (v) => sound.wall(v);
 sim.ev.onSling = () => sound.sling();
 sim.ev.onFlipper = (_i, v) => { if (v > 400) sound.wall(v * 0.6); };
 sim.ev.onLaunch = (p) => { sound.launch(p); state = 'playing'; };
+sim.ev.onTarget = (t) => sound.target(t.kind === 'drop');
+sim.ev.onBank = () => { sound.bank(); toast(L === 'ru' ? 'БОНУС: ВСЕ МИШЕНИ!' : 'DROP BANK BONUS!'); };
+sim.ev.onLane = (done) => { sound.lane(done); if (done) toast(L === 'ru' ? 'МНОЖИТЕЛЬ ×' + sim.mult : 'MULTIPLIER ×' + sim.mult); };
+sim.ev.onSpin = () => sound.spin();
+sim.ev.onSaucer = (e) => { sound.saucer(e); if (!e) toast(L === 'ru' ? 'ПРУД +1000' : 'POND +1000'); };
+sim.ev.onSave = () => { sound.save(); toast(L === 'ru' ? 'ШАР СПАСЁН!' : 'BALL SAVED!'); state = 'ready'; };
 sim.ev.onTilt = () => { sound.tilt(); view.nudgeShake(0); };
 sim.ev.onDrain = () => {
   sound.drain();
@@ -97,7 +105,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) setPa
 
 // automatic play for the title screen and for tests (?demo)
 const demo = new URLSearchParams(location.search).has('demo');
-let botT = 0;
+let botT = 0, laneT = 0;
 function bot() {
   botT += DT;
   if (state === 'ready' && botT > 1.2) { sim.launch(0.85 + Math.random() * 0.15); botT = 0; return; }
@@ -117,9 +125,13 @@ function frame(now: number) {
   if (state === 'ready' || state === 'playing') {
     if (charging) charge = Math.min(1, charge + dt / 0.9);
     acc += dt; let n = 0;
-    while (acc >= DT && n++ < 40) { if (demo) bot(); sim.step(); acc -= DT; }
+    while (acc >= DT && n++ < 40) {
+      if (demo) bot(); sim.step(); acc -= DT;
+      // a weak launch rolls back into the lane: the ball is ready to be launched again
+      if (state === 'playing' && sim.inLane) { laneT += DT; if (laneT > 0.35) { state = 'ready'; laneT = 0; } } else laneT = 0;
+    }
   } else if (state === 'menu') { /* idle; show the table behind the menu */ }
-  scoreEl.textContent = String(sim.score).padStart(7, '0');
+  scoreEl.textContent = String(sim.score).padStart(7, '0'); $('mult').textContent = sim.mult > 1 ? '×' + sim.mult : '';
   [...ballsEl.children].forEach((c, i) => c.classList.toggle('gone', i < sim.ballsLost));
   tiltEl.style.width = Math.min(100, sim.tiltMeter * 100) + '%';
   bannerEl.classList.toggle('on', sim.tilted);
