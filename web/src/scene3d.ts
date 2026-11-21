@@ -134,7 +134,7 @@ export class View {
     rbox(W2 * 2 + 1.0, TOP - BOT, 0.85, 0.2, 0, (TOP + BOT) / 2, -H2 - 0.425, woodMat);               // back panel
     rbox(W2 * 2, 0.16, 0.34, 0.07, 0, 0.56, H2 + 0.5, steel);                                           // lockdown bar along the top of the front panel
     const frontTex = canvasTex(frontTexture());
-    const front = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2 + 0.7, 1.75), new THREE.MeshPhysicalMaterial({ map: frontTex, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.1 }));
+    const front = new THREE.Mesh(new THREE.PlaneGeometry(W2 * 2 + 0.3, 1.75), new THREE.MeshPhysicalMaterial({ map: frontTex, roughness: 0.35, clearcoat: 1, clearcoatRoughness: 0.1 }));
     front.position.set(0, -0.62, FRONT + 0.002); s.add(front);
     // legs: bolted under the side panels with a mounting plate, tapered, with rubber feet
     const legMat = new THREE.MeshStandardMaterial({ color: 0xc9d0d8, metalness: 1, roughness: 0.25 });
@@ -325,7 +325,7 @@ export class View {
     cv.addEventListener('pointermove', (e) => {
       const p = ptrs.get(e.pointerId); if (!p) return;
       const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY;
-      if (ptrs.size === 1) { this.tAz = Math.max(-1.2, Math.min(1.2, this.tAz - dx * 0.006)); this.tEl = Math.max(0.3, Math.min(1.5, this.tEl + dy * 0.006)); }
+      if (ptrs.size === 1) { this.tAz = Math.max(-0.85, Math.min(0.85, this.tAz - dx * 0.006)); this.tEl = Math.max(0.42, Math.min(1.5, this.tEl + dy * 0.006)); }
       else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); if (pinch) this.tZoom = Math.max(0.5, Math.min(1.5, this.tZoom * pinch / d)); pinch = d; }
     });
     const up = (e: PointerEvent) => { ptrs.delete(e.pointerId); pinch = 0; };
