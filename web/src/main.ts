@@ -6,10 +6,10 @@ import { Sound } from './audio';
 const L = (navigator.language || 'en').toLowerCase().startsWith('ru') || /^(uk|be)/.test(navigator.language || '') ? 'ru' : 'en';
 const T = {
   ru: { score: 'Очки', world: 'Мир 1 · Сказочный лес', play: 'Играть', again: 'Ещё раз', resume: 'Продолжить', over: 'Игра окончена', pause: 'Пауза',
-        keys: '<kbd>Z</kbd> / <kbd>←</kbd> левая лопатка &nbsp; <kbd>/</kbd> / <kbd>→</kbd> правая<br><kbd>Пробел</kbd> удерживать и отпустить — запуск шара<br><kbd>A</kbd> / <kbd>D</kbd> толчок стола влево / вправо (не частите — будет TILT) &nbsp; <kbd>P</kbd> пауза',
+        keys: '<kbd>Z</kbd> / <kbd>←</kbd> левая лопатка &nbsp; <kbd>/</kbd> / <kbd>→</kbd> правая<br><kbd>Пробел</kbd> удерживать и отпустить — запуск шара<br><kbd>Shift</kbd> левый / правый или <kbd>A</kbd> / <kbd>D</kbd> — толчок стола влево / вправо (не частите — будет TILT) &nbsp; <kbd>P</kbd> пауза',
         hintLane: 'Удерживайте пробел и отпустите, чтобы запустить шар', hintLaneTouch: 'Удерживайте ▲ и отпустите, чтобы запустить шар', tilt: 'TILT' },
   en: { score: 'Score', world: 'World 1 · Fairy Forest', play: 'Play', again: 'Play again', resume: 'Resume', over: 'Game over', pause: 'Paused',
-        keys: '<kbd>Z</kbd> / <kbd>←</kbd> left flipper &nbsp; <kbd>/</kbd> / <kbd>→</kbd> right<br>Hold <kbd>Space</kbd>, release to launch<br><kbd>A</kbd> / <kbd>D</kbd> nudge the table left / right (too often = TILT) &nbsp; <kbd>P</kbd> pause',
+        keys: '<kbd>Z</kbd> / <kbd>←</kbd> left flipper &nbsp; <kbd>/</kbd> / <kbd>→</kbd> right<br>Hold <kbd>Space</kbd>, release to launch<br>left / right <kbd>Shift</kbd> or <kbd>A</kbd> / <kbd>D</kbd> nudge the table left / right (too often = TILT) &nbsp; <kbd>P</kbd> pause',
         hintLane: 'Hold Space and release to launch the ball', hintLaneTouch: 'Hold ▲ and release to launch the ball', tilt: 'TILT' },
 }[L];
 
@@ -75,7 +75,8 @@ addEventListener('keydown', (e) => {
   if (state === 'over' && (k === 'Space' || k === 'Enter')) { startGame(); e.preventDefault(); return; }
   if (k === 'KeyP' || k === 'Escape') { setPause(state !== 'paused'); return; }
   if (k === 'KeyM') { sound.setMuted(!sound.muted); $('bSound').style.opacity = sound.muted ? '.4' : '1'; return; }
-  if (e.shiftKey && (k === 'ArrowLeft' || k === 'ArrowRight')) { nudge(k === 'ArrowLeft' ? -1 : 1); e.preventDefault(); return; }
+  if (k === 'ShiftLeft') { nudge(-1); e.preventDefault(); return; }
+  if (k === 'ShiftRight') { nudge(1); e.preventDefault(); return; }
   if (k === 'KeyA') { nudge(-1); e.preventDefault(); return; }
   if (k === 'KeyD') { nudge(1); e.preventDefault(); return; }
   if (k === 'KeyZ' || k === 'ArrowLeft') flip(0, true);
